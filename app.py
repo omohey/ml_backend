@@ -40,7 +40,19 @@ app = Flask(__name__)
 # make cors work
 from flask_cors import CORS
 
-CORS(app)
+# CORS(app)
+CORS(
+    app,
+    origins="*",
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Methods",
+        "Access-Control-Allow-Headers",
+    ],
+    supports_credentials=True,
+)
 
 
 def one_hot_encode(age, checkup):
