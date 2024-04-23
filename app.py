@@ -239,8 +239,6 @@ def form():
         data = data + checkup + age
         data = np.array(data).reshape(1, -1)
 
-        return {"prediction": 1}
-
         model_prediction = model.predict(data, verbose=0)
         model_prediction = [1 if x[1] > x[0] else 0 for x in model_prediction]
         print(model_prediction)
