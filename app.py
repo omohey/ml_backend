@@ -40,19 +40,8 @@ app = Flask(__name__)
 # make cors work
 from flask_cors import CORS
 
-# CORS(app)
-CORS(
-    app,
-    origins="*",
-    allow_headers=[
-        "Content-Type",
-        "Authorization",
-        "Access-Control-Allow-Origin",
-        "Access-Control-Allow-Methods",
-        "Access-Control-Allow-Headers",
-    ],
-    supports_credentials=True,
-)
+# allow all origins and all headers and methods
+CORS(app)
 
 
 def one_hot_encode(age, checkup):
@@ -174,7 +163,6 @@ def form():
     print("Form")
     if request.method == "POST":
         print("Post")
-        return {"prediction": 1}
         # get the data from the body of the request
         height = request.json["height"]
         weight = request.json["weight"]
@@ -250,6 +238,8 @@ def form():
         ]
         data = data + checkup + age
         data = np.array(data).reshape(1, -1)
+
+        return {"prediction": 1}
 
         model_prediction = model.predict(data, verbose=0)
         model_prediction = [1 if x[1] > x[0] else 0 for x in model_prediction]
