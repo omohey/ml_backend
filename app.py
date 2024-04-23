@@ -174,6 +174,7 @@ def form():
     print("Form")
     if request.method == "POST":
         print("Post")
+        return {"prediction": 1}
         # get the data from the body of the request
         height = request.json["height"]
         weight = request.json["weight"]
