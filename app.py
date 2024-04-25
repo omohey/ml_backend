@@ -9,7 +9,7 @@ import pandas as pd
 # load model
 model = keras.models.load_model("model.keras")
 
-print("Model Trained")
+# print("Model Trained")
 
 
 # Importing flask module in the project is mandatory
@@ -160,9 +160,9 @@ def hello_world():
 @app.route("/predict", methods=["GET", "POST"])
 # if method is post add the data to the database
 def form():
-    print("Form")
+    # print("Form")
     if request.method == "POST":
-        print("Post")
+        # print("Post")
         # get the data from the body of the request
         height = request.json["height"]
         weight = request.json["weight"]
@@ -177,21 +177,21 @@ def form():
         gender = request.json["gender"]
         smoker = request.json["smoker"]
 
-        print(
-            "Data: ",
-            height,
-            weight,
-            bmi,
-            alcohol,
-            fruit,
-            greenVeg,
-            friedPotato,
-            age,
-            checkup,
-            exercise,
-            gender,
-            smoker,
-        )
+        # print(
+        #     "Data: ",
+        #     height,
+        #     weight,
+        #     bmi,
+        #     alcohol,
+        #     fruit,
+        #     greenVeg,
+        #     friedPotato,
+        #     age,
+        #     checkup,
+        #     exercise,
+        #     gender,
+        #     smoker,
+        # )
 
         # one hot encode the age and checkup
         age, checkup = one_hot_encode(age, checkup)
@@ -241,7 +241,7 @@ def form():
 
         model_prediction = model.predict(data, verbose=0)
         model_prediction = [1 if x[1] > x[0] else 0 for x in model_prediction]
-        print(model_prediction)
+        # print(model_prediction)
         return {"prediction": model_prediction[0]}
 
 
@@ -285,7 +285,7 @@ def truth():
         mycursor.execute(sql, val)
         mydb.commit()
         # print id of inserted record
-        print(mycursor.lastrowid)
+        # print(mycursor.lastrowid)
         # if row id is a multiple of 5 use online learning to update the model
         if mycursor.lastrowid % 5 == 0:
             # get the data from the database
