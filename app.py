@@ -4,7 +4,7 @@ from tensorflow import keras
 import numpy as np
 import pandas as pd
 
-print("Here")
+# print("Here")
 
 # load model
 model = keras.models.load_model("model.keras")
@@ -290,7 +290,7 @@ def truth():
         if mycursor.lastrowid % 5 == 0:
             # get the data from the database
             mycursor = mydb.cursor()
-            mycursor.execute("SELECT * FROM health_data ORDER BY ID DESC LIMIT 5;")
+            mycursor.execute("SELECT * FROM health_data;")
             myresult = mycursor.fetchall()
             data = pd.DataFrame(myresult)
             data.columns = [
@@ -473,13 +473,6 @@ def truth():
             y_model = keras.utils.to_categorical(Y, 2)
 
             # need to normalize
-
-            # use gradient tape to update the model
-            with tf.GradientTape() as tape:
-                y_pred = model(X, training=True)
-                loss = tf.keras.losses.binary_crossentropy(y_model, y_pred)
-            gradients = tape.gradient(loss, model.trainable_variables)
-            model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
         return {"status": "success"}
 
