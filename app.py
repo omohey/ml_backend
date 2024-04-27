@@ -3,13 +3,11 @@ import tensorflow as tf
 from tensorflow import keras
 import numpy as np
 import pandas as pd
+import threading
 
-# print("Here")
 
 # load model
 model = keras.models.load_model("model.keras")
-
-# print("Model Trained")
 
 
 # Importing flask module in the project is mandatory
@@ -148,6 +146,276 @@ def normalize_data(data):
     return data
 
 
+def get_csv_data():
+    data = pd.read_csv("CVD_cleaned.csv")
+    Y = data["Heart_Disease"]
+    X = data.drop(
+        [
+            "General_Health",
+            "Skin_Cancer",
+            "Other_Cancer",
+            "Depression",
+            "Diabetes",
+            "Arthritis",
+            "Heart_Disease",
+        ],
+        axis=1,
+    )
+    # one hot encoding for checkup column adding 5 columns checkup_past_year, checkup_past_2years, checkup_past_5years, checkup_more_5years, checkup_never
+    checkup = pd.get_dummies(X["Checkup"])
+
+    # reorder columns to have checkup_never at the end
+    checkup = checkup[
+        [
+            "Within the past year",
+            "Within the past 2 years",
+            "Within the past 5 years",
+            "5 or more years ago",
+            "Never",
+        ]
+    ]
+
+    # rename columns to have checkup_ prefix
+    checkup.columns = [
+        "checkup_past_year",
+        "checkup_past_2years",
+        "checkup_past_5years",
+        "checkup_more_5years",
+        "checkup_never",
+    ]
+
+    # drop the original checkup column
+    X = X.drop("Checkup", axis=1)
+
+    # make all false values 0 and all true values 1
+    checkup = checkup * 1
+
+    # concatenate the one hot encoded checkup columns
+    X = pd.concat([X, checkup], axis=1)
+
+    Age_Category = pd.get_dummies(X["Age_Category"])
+    # rename columns to have Age_ prefix
+    Age_Category.columns = [
+        "Age_18-24",
+        "Age_25-29",
+        "Age_30-34",
+        "Age_35-39",
+        "Age_40-44",
+        "Age_45-49",
+        "Age_50-54",
+        "Age_55-59",
+        "Age_60-64",
+        "Age_65-69",
+        "Age_70-74",
+        "Age_75-79",
+        "Age_80+",
+    ]
+
+    # drop the original Age_Category column
+    X = X.drop("Age_Category", axis=1)
+
+    # make all false values 0 and all true values 1
+    Age_Category = Age_Category * 1
+
+    # concatenate the one hot encoded Age_Category columns
+    X = pd.concat([X, Age_Category], axis=1)
+
+    X["Exercise"] = X["Exercise"].map({"Yes": 1, "No": 0})
+    X["Smoking_History"] = X["Smoking_History"].map({"Yes": 1, "No": 0})
+
+    X["Sex"] = X["Sex"].map({"Female": 1, "Male": 0})
+
+    Y = Y.map({"Yes": 1, "No": 0})
+
+    return X, Y
+
+
+def train_model():
+    global model
+    # get the data from the database
+    mycursor = mydb.cursor()
+    mycursor.execute("SELECT * FROM health_data;")
+    myresult = mycursor.fetchall()
+    data = pd.DataFrame(myresult)
+    data.columns = [
+        "id",
+        "height",
+        "weight",
+        "bmi",
+        "alcohol",
+        "fruit",
+        "greenVeg",
+        "friedPotato",
+        "age",
+        "checkup",
+        "exercise",
+        "female",
+        "smoker",
+        "truth",
+    ]
+    X = data.copy()
+    X = X.drop(["truth"], axis=1)
+    # correct ordering of columns is exercise, female, height, weight, bmi, smoker, alcohol, fruit, greenVeg, friedPotato, checkup, age
+    X = X[
+        [
+            "exercise",
+            "female",
+            "height",
+            "weight",
+            "bmi",
+            "smoker",
+            "alcohol",
+            "fruit",
+            "greenVeg",
+            "friedPotato",
+            "checkup",
+            "age",
+        ]
+    ]
+    # checkup and age should be one hot encoded
+    checkup = X["checkup"]
+    age = X["age"]
+    X = X.drop(["checkup", "age"], axis=1)
+    newCheckup = []
+    for i in range(len(checkup)):
+        if checkup[i] == 1:
+            newCheckup.append([1, 0, 0, 0, 0])
+        elif checkup[i] == 2:
+            newCheckup.append([0, 1, 0, 0, 0])
+        elif checkup[i] == 3:
+            newCheckup.append([0, 0, 1, 0, 0])
+        elif checkup[i] == 4:
+            newCheckup.append([0, 0, 0, 1, 0])
+        elif checkup[i] == 5:
+            newCheckup.append([0, 0, 0, 0, 1])
+
+    newAge = []
+    for i in range(len(age)):
+        if age[i] == 1:
+            newAge.append([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        elif age[i] == 2:
+            newAge.append([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        elif age[i] == 3:
+            newAge.append([0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        elif age[i] == 4:
+            newAge.append([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        elif age[i] == 5:
+            newAge.append([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+        elif age[i] == 6:
+            newAge.append([0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0])
+        elif age[i] == 7:
+            newAge.append([0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0])
+        elif age[i] == 8:
+            newAge.append([0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0])
+        elif age[i] == 9:
+            newAge.append([0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0])
+        elif age[i] == 10:
+            newAge.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0])
+        elif age[i] == 11:
+            newAge.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0])
+        elif age[i] == 12:
+            newAge.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0])
+        elif age[i] == 13:
+            newAge.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+
+    X = pd.concat(
+        [X, pd.DataFrame(newCheckup), pd.DataFrame(newAge)],
+        axis=1,
+        ignore_index=True,
+    )
+
+    X.columns = [
+        "Exercise",
+        "Sex",
+        "Height_(cm)",
+        "Weight_(kg)",
+        "BMI",
+        "Smoking_History",
+        "Alcohol_Consumption",
+        "Fruit_Consumption",
+        "Green_Vegetables_Consumption",
+        "FriedPotato_Consumption",
+        "checkup_past_year",
+        "checkup_past_2years",
+        "checkup_past_5years",
+        "checkup_more_5years",
+        "checkup_never",
+        "Age_18-24",
+        "Age_25-29",
+        "Age_30-34",
+        "Age_35-39",
+        "Age_40-44",
+        "Age_45-49",
+        "Age_50-54",
+        "Age_55-59",
+        "Age_60-64",
+        "Age_65-69",
+        "Age_70-74",
+        "Age_75-79",
+        "Age_80+",
+    ]
+
+    Y = data["truth"]
+
+    X_data, Y_data = get_csv_data()
+    # add the new data to the old data vertically
+    X = pd.concat([X, X_data], ignore_index=True)
+    Y = pd.concat([Y, Y_data], ignore_index=True)
+
+    X["Height_(cm)"] = (X["Height_(cm)"] - X["Height_(cm)"].mean()) / X[
+        "Height_(cm)"
+    ].std()
+    X["Weight_(kg)"] = (X["Weight_(kg)"] - X["Weight_(kg)"].mean()) / X[
+        "Weight_(kg)"
+    ].std()
+    X["BMI"] = (X["BMI"] - X["BMI"].mean()) / X["BMI"].std()
+
+    # the Fruit_Consumption, Green_Vegtables_Consumption, FriedPotato_Consumption, Alcohol_Consumption colums are exponentially distributed
+    X["Fruit_Consumption"] = np.log(X["Fruit_Consumption"] + 1)
+    X["Green_Vegetables_Consumption"] = np.log(X["Green_Vegetables_Consumption"] + 1)
+    X["FriedPotato_Consumption"] = np.log(X["FriedPotato_Consumption"] + 1)
+    X["Alcohol_Consumption"] = np.log(X["Alcohol_Consumption"] + 1)
+
+    X["Fruit_Consumption"] = (
+        X["Fruit_Consumption"] - X["Fruit_Consumption"].mean()
+    ) / X["Fruit_Consumption"].std()
+    X["Green_Vegetables_Consumption"] = (
+        X["Green_Vegetables_Consumption"] - X["Green_Vegetables_Consumption"].mean()
+    ) / X["Green_Vegetables_Consumption"].std()
+    X["FriedPotato_Consumption"] = (
+        X["FriedPotato_Consumption"] - X["FriedPotato_Consumption"].mean()
+    ) / X["FriedPotato_Consumption"].std()
+    X["Alcohol_Consumption"] = (
+        X["Alcohol_Consumption"] - X["Alcohol_Consumption"].mean()
+    ) / X["Alcohol_Consumption"].std()
+
+    y_model = keras.utils.to_categorical(Y, 2)
+
+    model = tf.keras.models.Sequential()
+    model.add(tf.keras.layers.Dense(7, activation="relu"))
+    model.add(tf.keras.layers.Dense(2, activation="softmax"))
+
+    model.compile(
+        metrics=[keras.metrics.F1Score()],
+        loss="categorical_crossentropy",
+        optimizer="rmsprop",
+    )
+
+    # give more weight to the positive class
+    class_weight = {0: 1, 1: 7}
+
+    model.fit(
+        X,
+        y_model,
+        epochs=15,
+        verbose=0,
+        class_weight=class_weight,
+        batch_size=32,
+    )
+
+    model.save("model.keras")
+
+
 # The route() function of the Flask class is a decorator,
 # which tells the application which URL should call
 # the associated function.
@@ -160,9 +428,8 @@ def hello_world():
 @app.route("/predict", methods=["GET", "POST"])
 # if method is post add the data to the database
 def form():
-    # print("Form")
+    global model
     if request.method == "POST":
-        # print("Post")
         # get the data from the body of the request
         height = request.json["height"]
         weight = request.json["weight"]
@@ -176,22 +443,6 @@ def form():
         exercise = request.json["exercise"]
         gender = request.json["gender"]
         smoker = request.json["smoker"]
-
-        # print(
-        #     "Data: ",
-        #     height,
-        #     weight,
-        #     bmi,
-        #     alcohol,
-        #     fruit,
-        #     greenVeg,
-        #     friedPotato,
-        #     age,
-        #     checkup,
-        #     exercise,
-        #     gender,
-        #     smoker,
-        # )
 
         # one hot encode the age and checkup
         age, checkup = one_hot_encode(age, checkup)
@@ -241,12 +492,12 @@ def form():
 
         model_prediction = model.predict(data, verbose=0)
         model_prediction = [1 if x[1] > x[0] else 0 for x in model_prediction]
-        # print(model_prediction)
         return {"prediction": model_prediction[0]}
 
 
 @app.route("/truth", methods=["GET", "POST"])
 def truth():
+    global model
     if request.method == "POST":
         # get the data from the body of the request
         height = request.json["height"]
@@ -284,195 +535,12 @@ def truth():
         )
         mycursor.execute(sql, val)
         mydb.commit()
-        # print id of inserted record
-        # print(mycursor.lastrowid)
-        # if row id is a multiple of 5 use online learning to update the model
-        if mycursor.lastrowid % 5 == 0:
-            # get the data from the database
-            mycursor = mydb.cursor()
-            mycursor.execute("SELECT * FROM health_data;")
-            myresult = mycursor.fetchall()
-            data = pd.DataFrame(myresult)
-            data.columns = [
-                "id",
-                "height",
-                "weight",
-                "bmi",
-                "alcohol",
-                "fruit",
-                "greenVeg",
-                "friedPotato",
-                "age",
-                "checkup",
-                "exercise",
-                "female",
-                "smoker",
-                "truth",
-            ]
-            X = data.copy()
-            X = X.drop(["truth"], axis=1)
-            # correct ordering of columns is exercise, female, height, weight, bmi, smoker, alcohol, fruit, greenVeg, friedPotato, checkup, age
-            X = X[
-                [
-                    "exercise",
-                    "female",
-                    "height",
-                    "weight",
-                    "bmi",
-                    "smoker",
-                    "alcohol",
-                    "fruit",
-                    "greenVeg",
-                    "friedPotato",
-                    "checkup",
-                    "age",
-                ]
-            ]
-            # checkup and age should be one hot encoded
-            checkup = X["checkup"]
-            age = X["age"]
-            X = X.drop(["checkup", "age"], axis=1)
-            for i in range(len(checkup)):
-                checkup[i] = (
-                    [1, 0, 0, 0, 0]
-                    if checkup[i] == 1
-                    else (
-                        [0, 1, 0, 0, 0]
-                        if checkup[i] == 2
-                        else (
-                            [0, 0, 1, 0, 0]
-                            if checkup[i] == 3
-                            else [0, 0, 0, 1, 0] if checkup[i] == 4 else [0, 0, 0, 0, 1]
-                        )
-                    )
-                )
-            for i in range(len(age)):
-                age[i] = (
-                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-                    if age[i] == 1
-                    else (
-                        [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-                        if age[i] == 2
-                        else (
-                            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-                            if age[i] == 3
-                            else (
-                                [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-                                if age[i] == 4
-                                else (
-                                    [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]
-                                    if age[i] == 5
-                                    else (
-                                        [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
-                                        if age[i] == 6
-                                        else (
-                                            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]
-                                            if age[i] == 7
-                                            else (
-                                                [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0]
-                                                if age[i] == 8
-                                                else (
-                                                    [
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        1,
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        0,
-                                                    ]
-                                                    if age[i] == 9
-                                                    else (
-                                                        [
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            1,
-                                                            0,
-                                                            0,
-                                                            0,
-                                                        ]
-                                                        if age[i] == 10
-                                                        else (
-                                                            [
-                                                                0,
-                                                                0,
-                                                                0,
-                                                                0,
-                                                                0,
-                                                                0,
-                                                                0,
-                                                                0,
-                                                                0,
-                                                                0,
-                                                                1,
-                                                                0,
-                                                                0,
-                                                            ]
-                                                            if age[i] == 11
-                                                            else (
-                                                                [
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    1,
-                                                                    0,
-                                                                ]
-                                                                if age[i] == 12
-                                                                else [
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    1,
-                                                                ]
-                                                            )
-                                                        )
-                                                    )
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            X = pd.concat(
-                [X, pd.DataFrame(checkup), pd.DataFrame(age)], axis=1, ignore_index=True
-            )
-            Y = data["truth"]
-            y_model = keras.utils.to_categorical(Y, 2)
-
-            # need to normalize
+        # if there are 10 new rows train the model
+        mycursor = mydb.cursor()
+        mycursor.execute("SELECT COUNT(*) FROM health_data;")
+        myresult = mycursor.fetchall()
+        if myresult[0][0] % 10 == 0:
+            threading.Thread(target=train_model).start()
 
         return {"status": "success"}
 
