@@ -479,10 +479,10 @@ def truth():
 
 @app.route("/get_data", methods=["GET"])
 def get_data():
-    mycursor = mydb.cursor()
-    mycursor.execute("SELECT * FROM health_data ORDER BY ID DESC LIMIT 5;")
+    mycursor = mydb.cursor(dictionary=True)
+    mycursor.execute("SELECT * FROM health_data;")
     myresult = mycursor.fetchall()
-    return {"data": myresult}
+    return myresult
 
 
 # main driver function
