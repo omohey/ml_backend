@@ -547,10 +547,32 @@ def truth():
 
 @app.route("/get_data", methods=["GET"])
 def get_data():
-    mycursor = mydb.cursor(dictionary=True)
+    mycursor = mydb.cursor()
     mycursor.execute("SELECT * FROM health_data;")
     myresult = mycursor.fetchall()
-    return myresult
+    # change the data to a list of dictionaries for each row
+    result = list(
+        map(
+            lambda x: {
+                "id": x[0],
+                "height": x[1],
+                "weight": x[2],
+                "BMI": x[3],
+                "alcohol_Consumption": x[4],
+                "fruit_Consumption": x[5],
+                "green_Vegtable_Consumption": x[6],
+                "fried_Potato_Consumption": x[7],
+                "age": x[8],
+                "checkup": x[9],
+                "isExercise": x[10],
+                "isFemale": x[11],
+                "isSmoker": x[12],
+                "truth": x[13],
+            },
+            myresult,
+        )
+    )
+    return result
 
 
 # main driver function
