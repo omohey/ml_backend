@@ -23,13 +23,17 @@ load_dotenv()
 
 
 # create a connection to the database
-mydb = mysql.connector.connect(
-    host=os.getenv("DB_HOST"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    database=os.getenv("DB_DATABASE"),
-)
+def create_connection():
+    mydb = mysql.connector.connect(
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database=os.getenv("DB_DATABASE"),
+    )
+    return mydb
 
+
+UPDATE_FREQUENCY = int(os.getenv("UPDATE_FREQUENCY"))
 
 # Flask constructor takes the name of
 # current module (__name__) as argument.
@@ -233,6 +237,7 @@ def get_csv_data():
 def train_model():
     global model
     # get the data from the database
+    mydb = create_connection()
     mycursor = mydb.cursor()
     mycursor.execute("SELECT * FROM health_data;")
     myresult = mycursor.fetchall()
@@ -392,25 +397,23 @@ def train_model():
     y_model = keras.utils.to_categorical(Y, 2)
 
     model = tf.keras.models.Sequential()
-    model.add(tf.keras.layers.Dense(7, activation="relu"))
+    model.add(tf.keras.layers.Dense(6, activation="tanh"))
+    model.add(tf.keras.layers.Dense(6, activation="tanh"))
+    model.add(tf.keras.layers.Dense(6, activation="tanh"))
     model.add(tf.keras.layers.Dense(2, activation="softmax"))
 
     model.compile(
-        metrics=[keras.metrics.F1Score()],
-        loss="categorical_crossentropy",
-        optimizer="rmsprop",
+        # adam optimizer with 0.05 learning rate
+        metrics=[],
+        loss="binary_crossentropy",
+        optimizer="adam",
     )
 
     # give more weight to the positive class
-    class_weight = {0: 1, 1: 7}
+    class_weight = {0: 1, 1: 5}
 
     model.fit(
-        X,
-        y_model,
-        epochs=15,
-        verbose=0,
-        class_weight=class_weight,
-        batch_size=32,
+        X, y_model, epochs=15, verbose=0, class_weight=class_weight, batch_size=32
     )
 
     model.save("model.keras")
@@ -497,6 +500,7 @@ def form():
 
 @app.route("/truth", methods=["GET", "POST"])
 def truth():
+    global UPDATE_FREQUENCY
     global model
     if request.method == "POST":
         # get the data from the body of the request
@@ -514,6 +518,7 @@ def truth():
         smoker = request.json["smoker"]
         truth = request.json["truth"]
 
+        mydb = create_connection()
         # # add the data to the database
         mycursor = mydb.cursor()
         sql = """INSERT INTO health_data (height, weight, BMI, alcohol_Consumption, fruit_Consumption, green_Vegtable_Consumption, fried_Potato_Consumption, age, checkup, isExercise, isFemale, isSmoker, truth)
@@ -539,7 +544,7 @@ def truth():
         mycursor = mydb.cursor()
         mycursor.execute("SELECT COUNT(*) FROM health_data;")
         myresult = mycursor.fetchall()
-        if myresult[0][0] % 10 == 0:
+        if myresult[0][0] % UPDATE_FREQUENCY == 0:
             threading.Thread(target=train_model).start()
 
         return {"status": "success"}
@@ -547,6 +552,7 @@ def truth():
 
 @app.route("/get_data", methods=["GET"])
 def get_data():
+    mydb = create_connection()
     mycursor = mydb.cursor()
     mycursor.execute("SELECT * FROM health_data;")
     myresult = mycursor.fetchall()
